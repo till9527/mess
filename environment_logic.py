@@ -1,10 +1,8 @@
 import sys
 import time
 import math
-from threading import Thread, Event  # Import Event
-import tkinter as tk
-from functools import partial
-
+from threading import Thread
+import threading
 # Quanser Imports
 from qvl.qlabs import QuanserInteractiveLabs
 from qvl.real_time import QLabsRealTime
@@ -173,307 +171,84 @@ def setup_node_following_map(qlabs):
     print("Map elements spawned successfully.")
 
 
-def set_light_color(light_handle, color_const, color_name):
-    """Callback function to set a specific light to a specific color."""
-    print(f"Setting light {light_handle.actorNumber} to {color_name}")
-    light_handle.set_color(color_const)
+def traffic_light_logic(traffic_light_1, traffic_light_2, traffic_light_3, traffic_light_4, interval_s=5):
+    """Run a 4-way traffic light cycle matching Setup_Real_Scenario.py."""
+    intersection_flag = 0
+    while True:
+        if intersection_flag == 0:
+            traffic_light_1.set_color(color=QLabsTrafficLight.COLOR_RED)
+            traffic_light_3.set_color(color=QLabsTrafficLight.COLOR_RED)
+            traffic_light_2.set_color(color=QLabsTrafficLight.COLOR_GREEN)
+            traffic_light_4.set_color(color=QLabsTrafficLight.COLOR_GREEN)
+        elif intersection_flag == 1:
+            traffic_light_1.set_color(color=QLabsTrafficLight.COLOR_RED)
+            traffic_light_3.set_color(color=QLabsTrafficLight.COLOR_RED)
+            traffic_light_2.set_color(color=QLabsTrafficLight.COLOR_YELLOW)
+            traffic_light_4.set_color(color=QLabsTrafficLight.COLOR_YELLOW)
+        elif intersection_flag == 2:
+            traffic_light_1.set_color(color=QLabsTrafficLight.COLOR_GREEN)
+            traffic_light_3.set_color(color=QLabsTrafficLight.COLOR_GREEN)
+            traffic_light_2.set_color(color=QLabsTrafficLight.COLOR_RED)
+            traffic_light_4.set_color(color=QLabsTrafficLight.COLOR_RED)
+        elif intersection_flag == 3:
+            traffic_light_1.set_color(color=QLabsTrafficLight.COLOR_YELLOW)
+            traffic_light_3.set_color(color=QLabsTrafficLight.COLOR_YELLOW)
+            traffic_light_2.set_color(color=QLabsTrafficLight.COLOR_RED)
+            traffic_light_4.set_color(color=QLabsTrafficLight.COLOR_RED)
 
-
-# --- Logic Functions for Threading ---
-
-
-def traffic_light_sequence(
-    traffic_light, stop_event, red_time=15, green_time=30, yellow_time=1, delay=0
-):
-    """
-    Controls the R-Y-G sequence for a single traffic light in a continuous loop.
-    Checks a stop_event to allow for graceful termination.
-    """
-    try:
-        # time.sleep(delay)
-        # Use wait() instead of sleep() so it can be interrupted
-        if stop_event.wait(delay):
-            print(
-                f"Light {traffic_light.actorNumber} sequence stopped during initial delay."
-            )
-            return  # Stop requested before we even started
-
-        while not stop_event.is_set():
-            # Check flag before each action
-            if stop_event.is_set():
-                break
-            traffic_light.set_color(QLabsTrafficLight.COLOR_GREEN)
-            # wait() returns True if event was set, False if it timed out
-            if stop_event.wait(green_time):
-                break  # Stop requested
-
-            if stop_event.is_set():
-                break
-            traffic_light.set_color(QLabsTrafficLight.COLOR_YELLOW)
-            if stop_event.wait(yellow_time):
-                break  # Stop requested
-
-            if stop_event.is_set():
-                break
-            traffic_light.set_color(QLabsTrafficLight.COLOR_RED)
-            if stop_event.wait(red_time):
-                break  # Stop requested
-
-        print(f"Traffic light {traffic_light.actorNumber} sequence stopped.")
-
-    except Exception as e:
-        print(f"Error in traffic_light_sequence for {traffic_light.actorNumber}: {e}")
-        # This can happen if the QLabs connection is closed while the thread is waiting
-        pass
+        intersection_flag = (intersection_flag + 1) % 4
+        time.sleep(interval_s)
 
 
 def pedestrian_patrol(person, start_location, end_location, speed):
-    """Controls a person to walk back and forth between two points."""
+    """
+    Controls a person to walk back and forth.
+    Calculates wait time manually to avoid timeouts at low speeds.
+    """
+    # 1. Calculate the total distance between points
+    distance = math.sqrt(
+        (end_location[0] - start_location[0]) ** 2
+        + (end_location[1] - start_location[1]) ** 2
+        + (end_location[2] - start_location[2]) ** 2
+    )
+
+    # 2. Calculate time required (Time = Distance / Speed)
+    # Add a 20% buffer to be safe
+    travel_time = (distance / speed) * 1.2
+
+    # print(f"Pedestrian Travel Time: {travel_time:.2f} seconds")
+
     while True:
         try:
+            # --- Move to End ---
+            # Set waitForConfirmation=False so the library doesn't time out
             person.move_to(location=end_location, speed=speed, waitForConfirmation=True)
-            time.sleep(10)
+
+            # Wait manually for the calculated travel time
+            time.sleep(travel_time)
+
+            # Optional: Wait a few seconds at the destination
+            time.sleep(2)
+
+            # --- Move to Start ---
             person.move_to(
                 location=start_location, speed=speed, waitForConfirmation=True
             )
-            time.sleep(10)
+
+            # Wait manually for the calculated travel time
+            time.sleep(travel_time)
+
+            # Optional: Wait a few seconds at the start
+            time.sleep(2)
+
         except Exception as e:
-            print(f"Pedestrian patrol interrupted (likely simulation shutdown): {e}")
-            break  # Exit loop on error
-
-
-# --- UI Control Class ---
-# Add near your other logic functions
-
-
-def weather_sequence(environment_handle):
-    """
-    Cycles through different weather presets at a given interval using system time.
-    """
-    WEATHER_PRESETS = [
-        ("Clear", QLabsEnvironmentOutdoors.CLEAR_SKIES),
-        ("Cloudy", QLabsEnvironmentOutdoors.CLOUDY),
-        ("Rain", QLabsEnvironmentOutdoors.RAIN),
-        ("Snow", QLabsEnvironmentOutdoors.SNOW),
-    ]
-
-    preset_index = 0
-    num_presets = len(WEATHER_PRESETS)
-
-    try:
-        while True:
-            # Apply the weather BEFORE waiting
-            weather_name, weather_const = WEATHER_PRESETS[preset_index]
-            environment_handle.set_weather_preset(weather_const)
-            print(f"Weather set to: {weather_name}")
-
-            # Increment index for the NEXT cycle
-            preset_index = (preset_index + 1) % num_presets
-            time.sleep(15)
-
-            # Use stop_event.wait() to sleep, allowing for immediate interruption on shutdown
-
-        print("Weather sequence stopped.")
-
-    except Exception as e:
-        print(f"Error in weather_sequence: {e}")
-
-
-class TrafficControlApp:
-    def __init__(self, root, light_handles):
-        self.root = root
-        self.light_4_handle = light_handles[0]
-        self.light_3_handle = light_handles[1]
-
-        self.light_threads = []
-        self.stop_events = []
-
-        # State variable for the toggle
-        self.auto_mode_var = tk.BooleanVar(value=True)
-
-        self.setup_ui()
-        self.on_toggle()  # Call once to set initial state (auto mode)
-
-    def setup_ui(self):
-        # --- Frame for Toggle ---
-        toggle_frame = tk.Frame(self.root)
-        toggle_frame.pack(fill=tk.X, padx=10, pady=5)
-
-        self.toggle_button = tk.Checkbutton(
-            toggle_frame,
-            text="Automatic Mode",
-            variable=self.auto_mode_var,
-            command=self.on_toggle,
-            font=("Helvetica", 10, "bold"),
-        )
-        self.toggle_button.pack()
-
-        # --- Frame for Light 4 ---
-        frame4 = tk.Frame(self.root, relief=tk.RIDGE, borderwidth=2)
-        frame4.pack(fill=tk.X, padx=10, pady=5)
-        tk.Label(frame4, text="Light ID 4 (Positive X)").pack()
-
-        self.btn_4_g = tk.Button(
-            frame4,
-            text="Green",
-            bg="#70e070",
-            command=partial(
-                set_light_color,
-                self.light_4_handle,
-                QLabsTrafficLight.COLOR_GREEN,
-                "GREEN",
-            ),
-        )
-        self.btn_4_g.pack(side=tk.LEFT, expand=True, fill=tk.X)
-
-        self.btn_4_y = tk.Button(
-            frame4,
-            text="Yellow",
-            bg="#f0e070",
-            command=partial(
-                set_light_color,
-                self.light_4_handle,
-                QLabsTrafficLight.COLOR_YELLOW,
-                "YELLOW",
-            ),
-        )
-        self.btn_4_y.pack(side=tk.LEFT, expand=True, fill=tk.X)
-
-        self.btn_4_r = tk.Button(
-            frame4,
-            text="Red",
-            bg="#f07070",
-            command=partial(
-                set_light_color, self.light_4_handle, QLabsTrafficLight.COLOR_RED, "RED"
-            ),
-        )
-        self.btn_4_r.pack(side=tk.LEFT, expand=True, fill=tk.X)
-
-        # --- Frame for Light 3 ---
-        frame3 = tk.Frame(self.root, relief=tk.RIDGE, borderwidth=2)
-        frame3.pack(fill=tk.X, padx=10, pady=5)
-        tk.Label(frame3, text="Light ID 3 (Negative X)").pack()
-
-        self.btn_3_g = tk.Button(
-            frame3,
-            text="Green",
-            bg="#70e070",
-            command=partial(
-                set_light_color,
-                self.light_3_handle,
-                QLabsTrafficLight.COLOR_GREEN,
-                "GREEN",
-            ),
-        )
-        self.btn_3_g.pack(side=tk.LEFT, expand=True, fill=tk.X)
-
-        self.btn_3_y = tk.Button(
-            frame3,
-            text="Yellow",
-            bg="#f0e070",
-            command=partial(
-                set_light_color,
-                self.light_3_handle,
-                QLabsTrafficLight.COLOR_YELLOW,
-                "YELLOW",
-            ),
-        )
-        self.btn_3_y.pack(side=tk.LEFT, expand=True, fill=tk.X)
-
-        self.btn_3_r = tk.Button(
-            frame3,
-            text="Red",
-            bg="#f07070",
-            command=partial(
-                set_light_color, self.light_3_handle, QLabsTrafficLight.COLOR_RED, "RED"
-            ),
-        )
-        self.btn_3_r.pack(side=tk.LEFT, expand=True, fill=tk.X)
-
-        # Store buttons for easy access
-        self.manual_buttons = [
-            self.btn_4_g,
-            self.btn_4_y,
-            self.btn_4_r,
-            self.btn_3_g,
-            self.btn_3_y,
-            self.btn_3_r,
-        ]
-
-    def set_manual_buttons_state(self, state):
-        """Helper function to enable/disable all manual buttons."""
-        for btn in self.manual_buttons:
-            btn.config(state=state)
-
-    def on_toggle(self):
-        """Called when the toggle button is clicked."""
-        if self.auto_mode_var.get():
-            # --- SWITCHING TO AUTOMATIC ---
-            print("Switching to AUTOMATIC mode.")
-            self.set_manual_buttons_state(tk.DISABLED)
-            self.start_auto_sequences()
-        else:
-            # --- SWITCHING TO MANUAL ---
-            print("Switching to MANUAL mode.")
-            self.stop_auto_sequences()
-            self.set_manual_buttons_state(tk.NORMAL)
-
-    def start_auto_sequences(self):
-        """Stops any existing sequences and starts new ones."""
-        self.stop_auto_sequences()  # Ensure old ones are stopped
-
-        print("Starting automatic light sequences...")
-
-        # Create event and thread for Light 4
-        stop_event_4 = Event()
-        t4 = Thread(
-            target=traffic_light_sequence,
-            args=(self.light_4_handle, stop_event_4, 15, 30, 1, 0),  # 0s delay
-            daemon=True,  # Make daemon so it exits if main thread dies
-        )
-
-        # Create event and thread for Light 3
-        stop_event_3 = Event()
-        t3 = Thread(
-            target=traffic_light_sequence,
-            args=(
-                self.light_3_handle,
-                stop_event_3,
-                15,
-                30,
-                1,
-                16,
-            ),  # 16s delay (Yellow + Red)
-            daemon=True,
-        )
-
-        self.stop_events = [stop_event_4, stop_event_3]
-        self.light_threads = [t4, t3]
-
-        t4.start()
-        t3.start()
-
-    def stop_auto_sequences(self):
-        """Signals all running traffic light threads to stop."""
-        if not self.light_threads:
-            return  # Nothing to stop
-
-        print("Stopping automatic light sequences...")
-
-        for event in self.stop_events:
-            event.set()  # Signal threads to stop
-
-        for thread in self.light_threads:
-            thread.join(timeout=0.5)  # Wait briefly for them to exit
-
-        self.light_threads = []
-        self.stop_events = []
+            print(f"Pedestrian patrol interrupted: {e}")
+            break
 
 
 # --- Main Script Execution ---
 if __name__ == "__main__":
     qlabs = None
-    app = None
     try:
         print("Connecting to QLabs...")
         qlabs = QuanserInteractiveLabs()
@@ -535,48 +310,134 @@ if __name__ == "__main__":
             waitForConfirmation=True,
         )
 
-        # Spawn Pedestrian
-        NEW_CW_START = [14.5, 6.0, 0.2]
-        NEW_CW_END = [14.5, 13.0, 0.2]
-
+        
+        PED_1_START = [-5.52, 13.39, 0.05]
+        PED_1_END = [-5.52, 5.27, 0.05]
+        PED_1_START_ALT = [-45.69, 15.82, 0]
+        PED_1_END_ALT = [42.29, 15.48, 0]
+        PED_2_START = [-3.02, 3.46, 0.06]
+        PED_2_END = [5.79, 3.46, 0.06]
+        PED_3_START = [-3.97, 15.81, 0.06]
+        PED_3_END = [5.71, 15.81, 0.06]
+        PED_4_START = [7.57, 14.44, 0.06]
+        PED_4_END = [7.57, 4.54, 0.06]
+        PED_5_START = [14.46, 14.11, 0.06]
+        PED_5_END = [14.46, 4.72, 0.06]
+        PED_6_START = [-22.15, 2.16, 0.06]
+        PED_6_END = [-13.87, 2.16, 0.06]
+        # 2. Spawn the person
         person1 = QLabsPerson(qlabs)
         person1.spawn_id(
-            actorNumber=0,
-            location=NEW_CW_START,
-            rotation=[0, 0, math.pi / 2],
+            actorNumber=100,  # Unique ID (avoid conflict with cars/lights)
+            location=PED_1_START,
+            rotation=[0, 0, 0],  # Facing +X
             scale=[1, 1, 1],
-            configuration=9,
+            configuration=9,  # 0=Casual Male, 1=Casual Female, etc.
             waitForConfirmation=True,
         )
-
-        print("All actors have been spawned.")
-
-        # == 2. LOGIC PHASE ==
-        print("Starting background logic...")
-
-        # Start pedestrian logic
-        Thread(
+        person1.enable_collsion(enable=True, waitForConfirmation=True)
+        person1.add_collision_filter(161, waitForConfirmation=True)  # Filter for cars
+        person2 = QLabsPerson(qlabs)
+        person2.spawn_id(
+            actorNumber=101,  # Unique ID (avoid conflict with cars/lights)
+            location=PED_2_START,
+            rotation=[0, 0, 0],  # Facing +X
+            scale=[1, 1, 1],
+            configuration=0,  # 0=Casual Male, 1=Casual Female, etc.
+            waitForConfirmation=True,
+        )
+        person2.enable_collsion(enable=True, waitForConfirmation=True)
+        person2.add_collision_filter(161, waitForConfirmation=True)  # Filter for cars
+        person3 = QLabsPerson(qlabs)
+        person3.spawn_id(
+            actorNumber=102,  # Unique ID (avoid conflict with cars/lights)
+            location=PED_3_START,
+            rotation=[0, 0, 0],  # Facing +X
+            scale=[1, 1, 1],
+            configuration=0,  # 0=Casual Male, 1=Casual Female, etc.
+            waitForConfirmation=True,
+        )
+        person3.enable_collsion(enable=True, waitForConfirmation=True)
+        person3.add_collision_filter(161, waitForConfirmation=True)  # Filter for cars
+        person4 = QLabsPerson(qlabs)
+        person4.spawn_id(
+            actorNumber=103,  # Unique ID (avoid conflict with cars/lights)
+            location=PED_4_START,
+            rotation=[0, 0, 0],  # Facing +X
+            scale=[1, 1, 1],
+            configuration=0,  # 0=Casual Male, 1=Casual Female, etc.
+            waitForConfirmation=True,
+        )
+        person4.enable_collsion(enable=True, waitForConfirmation=True)
+        person4.add_collision_filter(161, waitForConfirmation=True)  # Filter for cars
+        person5 = QLabsPerson(qlabs)
+        person5.spawn_id(
+            actorNumber=104,  # Unique ID (avoid conflict with cars/lights)
+            location=PED_5_START,
+            rotation=[0, 0, 0],  # Facing +X
+            scale=[1, 1, 1],
+            configuration=0,  # 0=Casual Male, 1=Casual Female, etc.
+            waitForConfirmation=True,
+        )
+        person5.enable_collsion(enable=True, waitForConfirmation=True)
+        person5.add_collision_filter(161, waitForConfirmation=True)  # Filter for cars
+        person6 = QLabsPerson(qlabs)
+        person6.spawn_id(
+            actorNumber=105,  # Unique ID (avoid conflict with cars/lights)
+            location=PED_6_START,
+            rotation=[0, 0, 0],  # Facing +X
+            scale=[1, 1, 1],
+            configuration=0,  # 0=Casual Male, 1=Casual Female, etc.
+            waitForConfirmation=True,
+        )
+        person6.enable_collsion(enable=True, waitForConfirmation=True)
+        person6.add_collision_filter(161, waitForConfirmation=True)  # Filter for cars
+        ped_1_thread = threading.Thread(
             target=pedestrian_patrol,
-            args=(person1, NEW_CW_START, NEW_CW_END, 1.2),
+            args=(person1, PED_1_START, PED_1_END, 1.0),  # 1.0 m/s walking speed
             daemon=True,
-        ).start()
+        )
+        ped_1_thread.start()
+        ped_2_thread = threading.Thread(
+            target=pedestrian_patrol,
+            args=(person2, PED_2_START, PED_2_END, 1.0),  # 1.0 m/s walking speed
+            daemon=True,
+        )
+        ped_2_thread.start()
+        ped_3_thread = threading.Thread(
+            target=pedestrian_patrol,
+            args=(person3, PED_3_START, PED_3_END, 1.0),  # 1.0 m/s walking speed
+            daemon=True,
+        )
+        ped_3_thread.start()
+        ped_4_thread = threading.Thread(
+            target=pedestrian_patrol,
+            args=(person4, PED_4_START, PED_4_END, 1.0),  # 1.0 m/s walking speed
+            daemon=True,
+        )
+        ped_4_thread.start()
+        ped_5_thread = threading.Thread(
+            target=pedestrian_patrol,
+            args=(person5, PED_5_START, PED_5_END, 1.0),  # 1.0 m/s walking speed
+            daemon=True,
+        )
+        ped_5_thread.start()
+        ped_6_thread = threading.Thread(
+            target=pedestrian_patrol,
+            args=(person6, PED_6_START, PED_6_END, 1.0),  # 1.0 m/s walking speed
+            daemon=True,
+        )
+        ped_6_thread.start()
 
         Thread(
-            target=weather_sequence,
-            args=(hEnvironmentOutdoors2,),
+            target=traffic_light_logic,
+            args=(tl1, tl2, tl3, tl4),
             daemon=True,
         ).start()
 
-        # == 3. UI CONTROL PHASE ==
-        print("Launching Traffic Light Control UI...")
-        root = tk.Tk()
-        root.title("Traffic Light Control")
-
-        app = TrafficControlApp(root, [tl4, tl3])
-
-        root.protocol("WM_DELETE_WINDOW", lambda: print("Use Ctrl+C to stop."))
-        print("UI is running. Press Ctrl+C in the console to quit.")
-        root.mainloop()
+        print("Traffic light sequence running. Press Ctrl+C in the console to quit.")
+        while True:
+            time.sleep(1)
 
     except KeyboardInterrupt:
         print("\nScript terminated by user.")
@@ -584,8 +445,6 @@ if __name__ == "__main__":
         print(f"\nAn unexpected error occurred: {e}")
     finally:
         print("Shutting down...")
-        if app:
-            app.stop_auto_sequences()
         if qlabs and qlabs.is_open():
             qlabs.close()
         sys.exit(0)

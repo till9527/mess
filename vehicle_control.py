@@ -18,7 +18,7 @@ import controller_qcar as controller  # The brain
 from pal.products.qcar import QCar, QCarGPS, IS_PHYSICAL_QCAR
 from pal.utilities.math import wrap_to_pi
 from hal.content.qcar_functions import QCarEKF
-from hal.products.mats import SDCSRoadMap
+from custom_roadmap import CustomRoadMap
 from qvl.multi_agent import readRobots
 from qvl.real_time import QLabsRealTime
 
@@ -34,7 +34,7 @@ K_p = 0.1
 K_i = 1
 enableSteeringControl = True
 K_stanley = 1
-nodeSequence = [10, 2, 4, 14, 20, 22, 10]
+nodeSequence = [10, 2, 4, 14, 16, 18, 11, 12, 8,10]
 # endregion
 
 # --- REMOVED: V2X Configuration section ---
@@ -42,7 +42,7 @@ nodeSequence = [10, 2, 4, 14, 20, 22, 10]
 
 # region : Initial Setup
 if enableSteeringControl:
-    roadmap = SDCSRoadMap(leftHandTraffic=False)
+    roadmap = CustomRoadMap()
     waypointSequence = roadmap.generate_path(nodeSequence)
     initialPose = roadmap.get_node_pose(nodeSequence[0]).squeeze()
 else:
