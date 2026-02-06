@@ -175,29 +175,33 @@ def traffic_light_logic(traffic_light_1, traffic_light_2, traffic_light_3, traff
     """Run a 4-way traffic light cycle matching Setup_Real_Scenario.py."""
     intersection_flag = 0
     while True:
-        if intersection_flag == 0:
-            traffic_light_1.set_color(color=QLabsTrafficLight.COLOR_RED)
-            traffic_light_3.set_color(color=QLabsTrafficLight.COLOR_RED)
-            traffic_light_2.set_color(color=QLabsTrafficLight.COLOR_GREEN)
-            traffic_light_4.set_color(color=QLabsTrafficLight.COLOR_GREEN)
-        elif intersection_flag == 1:
-            traffic_light_1.set_color(color=QLabsTrafficLight.COLOR_RED)
-            traffic_light_3.set_color(color=QLabsTrafficLight.COLOR_RED)
-            traffic_light_2.set_color(color=QLabsTrafficLight.COLOR_YELLOW)
-            traffic_light_4.set_color(color=QLabsTrafficLight.COLOR_YELLOW)
-        elif intersection_flag == 2:
-            traffic_light_1.set_color(color=QLabsTrafficLight.COLOR_GREEN)
-            traffic_light_3.set_color(color=QLabsTrafficLight.COLOR_GREEN)
-            traffic_light_2.set_color(color=QLabsTrafficLight.COLOR_RED)
-            traffic_light_4.set_color(color=QLabsTrafficLight.COLOR_RED)
-        elif intersection_flag == 3:
-            traffic_light_1.set_color(color=QLabsTrafficLight.COLOR_YELLOW)
-            traffic_light_3.set_color(color=QLabsTrafficLight.COLOR_YELLOW)
-            traffic_light_2.set_color(color=QLabsTrafficLight.COLOR_RED)
-            traffic_light_4.set_color(color=QLabsTrafficLight.COLOR_RED)
+        try:
+            if intersection_flag == 0:
+                traffic_light_1.set_color(color=QLabsTrafficLight.COLOR_RED)
+                traffic_light_3.set_color(color=QLabsTrafficLight.COLOR_RED)
+                traffic_light_2.set_color(color=QLabsTrafficLight.COLOR_GREEN)
+                traffic_light_4.set_color(color=QLabsTrafficLight.COLOR_GREEN)
+            elif intersection_flag == 1:
+                traffic_light_1.set_color(color=QLabsTrafficLight.COLOR_RED)
+                traffic_light_3.set_color(color=QLabsTrafficLight.COLOR_RED)
+                traffic_light_2.set_color(color=QLabsTrafficLight.COLOR_YELLOW)
+                traffic_light_4.set_color(color=QLabsTrafficLight.COLOR_YELLOW)
+            elif intersection_flag == 2:
+                traffic_light_1.set_color(color=QLabsTrafficLight.COLOR_GREEN)
+                traffic_light_3.set_color(color=QLabsTrafficLight.COLOR_GREEN)
+                traffic_light_2.set_color(color=QLabsTrafficLight.COLOR_RED)
+                traffic_light_4.set_color(color=QLabsTrafficLight.COLOR_RED)
+            elif intersection_flag == 3:
+                traffic_light_1.set_color(color=QLabsTrafficLight.COLOR_YELLOW)
+                traffic_light_3.set_color(color=QLabsTrafficLight.COLOR_YELLOW)
+                traffic_light_2.set_color(color=QLabsTrafficLight.COLOR_RED)
+                traffic_light_4.set_color(color=QLabsTrafficLight.COLOR_RED)
 
-        intersection_flag = (intersection_flag + 1) % 4
-        time.sleep(interval_s)
+            intersection_flag = (intersection_flag + 1) % 4
+            time.sleep(interval_s)
+        except Exception as exc:
+            print(f"Traffic light sequence error: {exc}")
+            time.sleep(1)
 
 
 def pedestrian_patrol(person, start_location, end_location, speed):
@@ -240,10 +244,9 @@ def pedestrian_patrol(person, start_location, end_location, speed):
 
             # Optional: Wait a few seconds at the start
             time.sleep(2)
-
-        except Exception as e:
-            print(f"Pedestrian patrol interrupted: {e}")
-            break
+        except Exception as exc:
+            print(f"Pedestrian patrol error: {exc}")
+            time.sleep(1)
 
 
 # --- Main Script Execution ---
@@ -343,7 +346,7 @@ if __name__ == "__main__":
             location=PED_2_START,
             rotation=[0, 0, 0],  # Facing +X
             scale=[1, 1, 1],
-            configuration=0,  # 0=Casual Male, 1=Casual Female, etc.
+            configuration=9,  # 0=Casual Male, 1=Casual Female, etc.
             waitForConfirmation=True,
         )
         person2.enable_collsion(enable=True, waitForConfirmation=True)
@@ -354,7 +357,7 @@ if __name__ == "__main__":
             location=PED_3_START,
             rotation=[0, 0, 0],  # Facing +X
             scale=[1, 1, 1],
-            configuration=0,  # 0=Casual Male, 1=Casual Female, etc.
+            configuration=9,  # 0=Casual Male, 1=Casual Female, etc.
             waitForConfirmation=True,
         )
         person3.enable_collsion(enable=True, waitForConfirmation=True)
@@ -365,7 +368,7 @@ if __name__ == "__main__":
             location=PED_4_START,
             rotation=[0, 0, 0],  # Facing +X
             scale=[1, 1, 1],
-            configuration=0,  # 0=Casual Male, 1=Casual Female, etc.
+            configuration=9,  # 0=Casual Male, 1=Casual Female, etc.
             waitForConfirmation=True,
         )
         person4.enable_collsion(enable=True, waitForConfirmation=True)
@@ -376,7 +379,7 @@ if __name__ == "__main__":
             location=PED_5_START,
             rotation=[0, 0, 0],  # Facing +X
             scale=[1, 1, 1],
-            configuration=0,  # 0=Casual Male, 1=Casual Female, etc.
+            configuration=9,  # 0=Casual Male, 1=Casual Female, etc.
             waitForConfirmation=True,
         )
         person5.enable_collsion(enable=True, waitForConfirmation=True)
@@ -387,7 +390,7 @@ if __name__ == "__main__":
             location=PED_6_START,
             rotation=[0, 0, 0],  # Facing +X
             scale=[1, 1, 1],
-            configuration=0,  # 0=Casual Male, 1=Casual Female, etc.
+            configuration=9,  # 0=Casual Male, 1=Casual Female, etc.
             waitForConfirmation=True,
         )
         person6.enable_collsion(enable=True, waitForConfirmation=True)
