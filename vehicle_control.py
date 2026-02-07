@@ -252,22 +252,24 @@ if __name__ == "__main__":
         # --- Start All Processes and Threads ---
 
         # 1. Perception Module (Eyes)
-        perception_proc = Thread(target=run_perception, args=(perception_queue, 0))
+        perception_proc = Thread(
+            target=run_perception, args=(perception_queue, 0, True)
+        )
         perception_proc.start()
 
         # --- REMOVED: V2X Status Thread ---
 
         # 3. Controller Module (Brain)
         # MODIFIED: Args are now much simpler
-        controller_proc = mp.Process(
-            target=controller.main,
-            args=(
-                perception_queue,
-                command_queue,
-                shared_pose,
-            ),
-        )
-        controller_proc.start()
+        # controller_proc = mp.Process(
+        #     target=controller.main,
+        #     args=(
+        #         perception_queue,
+        #         command_queue,
+        #         shared_pose,
+        #     ),
+        # )
+        # controller_proc.start()
 
         # 4. Main Control Loop (Hands)
         control_thread = Thread(target=controlLoop, args=(command_queue, shared_pose))
@@ -282,12 +284,12 @@ if __name__ == "__main__":
         print("Initiating shutdown...")
         KILL_THREAD = True
 
-        if controller_proc.is_alive():
-            controller_proc.terminate()
+        # if controller_proc.is_alive():
+        #     controller_proc.terminate()
         perception_proc.join()
         # --- REMOVED: statusThread.join() ---
         control_thread.join()
-        controller_proc.join()
+        # controller_proc.join()
         print("✅ All threads and processes joined.")
 
         # --- REMOVED: QLabs close logic ---

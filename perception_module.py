@@ -3,10 +3,12 @@ import cv2
 import torch
 import sys
 import time
+import numpy as np
 from ultralytics import YOLO
 from qvl.qlabs import QuanserInteractiveLabs
 from qvl.qcar2 import QLabsQCar2
 from pal.products.qcar import IS_PHYSICAL_QCAR
+from hal.utilities.image_processing import ImageProcessing
 
 # --- NEW: Import for V2X ---
 from qvl.traffic_light import QLabsTrafficLight
@@ -37,16 +39,27 @@ def get_traffic_lights_status():
     except Exception as e:
         # Don't print an error every loop, just return UNKNOWN
         return ["UNKNOWN"] * len(traffic_light_handles)
+def process_lane_image(image):
+    croppedRGB = image[150:820, :, :]
+    hsvBuf = cv2.cvtColor(croppedRGB, cv2.COLOR_BGR2HSV)
+    yellow_bin = ImageProcessing.binary_thresholding(
+        hsvBuf, np.array([0, 0, 200]), np.array([45, 255, 255])
+    )
 
+    white_bin = ImageProcessing.binary_thresholding(
+        hsvBuf, np.array([0, 0, 200]), np.array([180, 50, 255])
+    )
 
-def run_perception(perception_queue, actor_id):
+    return cv2.bitwise_or(yellow_bin, white_bin)
+
+def run_perception(perception_queue, actor_id, enable_lane=False):
     """
     This function handles the perception pipeline AND V2X data gathering.
     It sends results to a queue.
     """
     print(f"[Perception-{actor_id}] Starting thread...")
     MODEL_PATH = "model/best.pt"
-    CAMERA_TO_USE = QLabsQCar2.CAMERA_RGB
+    CAMERA_TO_USE = QLabsQCar2.CAMERA_CSI_FRONT
 
     qlabs = None
     try:
@@ -80,6 +93,9 @@ def run_perception(perception_queue, actor_id):
         while not KILL_THREAD:
             ok, image = car.get_image(CAMERA_TO_USE)
             if ok:
+                if enable_lane:
+                    binaryImage = process_lane_image(image)
+                    cv2.imshow("Combined Lane Detection", binaryImage)
                 results = model(image, device=device, conf=0.4, verbose=False)[0]
 
                 # --- NEW: Bundle perception AND v2x data ---
