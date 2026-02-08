@@ -34,7 +34,43 @@ K_p = 0.1
 K_i = 1
 enableSteeringControl = True
 K_stanley = 1
-nodeSequence = [10, 2, 4, 14, 16, 18, 11, 12, 8,10]
+nodeSequence =  [
+    10,
+    2,
+    4,
+    14,
+    16,
+    18,
+    11,
+    12,
+    7,
+    5,
+    3,
+    1,
+    8,
+    23,
+    21,
+    16,
+    17,
+    20,
+    22,
+    9,
+    0,
+    2,
+    4,
+    6,
+    13,
+    19,
+    17,
+    15,
+    6,
+    0,
+    2,
+    4,
+    6,
+    8,
+    10,
+]
 # endregion
 
 # --- REMOVED: V2X Configuration section ---
